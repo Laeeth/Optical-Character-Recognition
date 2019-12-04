@@ -8,7 +8,7 @@ import std.file : append;
 import std.range : iota;
 
 //this function reads text from an image file
-string readTextImage(bool individual, string name)
+string readTextImage(bool individual, string name, char letter = ' ')
 {
     Image img = Image.fromMemoryImage(loadImageFromFile(name));
     SimpleWindow window = new SimpleWindow(img, "OCR simulation");
@@ -39,7 +39,7 @@ string readTextImage(bool individual, string name)
                     count_the_written_parts;
                     //in case you need to store the mapped array of `true` and `false`
                     if (false)
-                        append("testedSet.txt", to!string(writtenParts) ~ ", ");
+                        append(letter ~ "/" ~ letter ~ "_trainingSet.txt", to!string(writtenParts) ~ ", ");
                     text ~= identifyCharacter(individual, writtenParts);
                     first = false;
                 }
@@ -56,13 +56,13 @@ mixin template declare_necessary_variables_and_delegates()
 {
     bool edge, first = true;
     byte colorSum = 50;
-    int firstX, firstY, lastX = 1, lastY = 1, left, right, top, bottom, firstLetterSize, spacing;
+    int firstX, firstY, lastX, lastY, left, right, top, bottom, firstLetterSize, spacing;
     string text;
     Color pixel;
     Rectangle frame;
-    bool[400] writtenParts = void;
-    int[21] piecesH = void, piecesV = void;
-    Rectangle[400] rectangularPieces = void;
+    bool[484] writtenParts = void;
+    int[23] piecesH = void, piecesV = void;
+    Rectangle[484] rectangularPieces = void;
     bool[Point] writtenPoints;
 
     //here we create a frame around the line with the phrase
@@ -153,27 +153,51 @@ mixin template declare_necessary_variables_and_delegates()
         while (!edge && firstX <= img.width);
         //I need to remove the 2 extra increments that happen at the end
         right = firstX - 2;
-        frame = Rectangle(left, top, right, bottom);
+        //this loop finds the top of the letter independent of the top of the line of the phrase
+        outer1: foreach (y; firstY .. lastY + 1)
+            foreach (x; left .. right + 1)
+            {
+                pixel = img.getPixel(x, y);
+                if (pixel.r + pixel.g + pixel.b <= colorSum)
+                {
+                    top = y;
+                    break outer1;
+                }
+            }
+        //this loop finds the bottom of the letter independent of the bottom of the line of the phrase
+        outer2: foreach (y; top .. lastY + 1)
+            foreach (x; left .. right + 1)
+            {
+                pixel = img.getPixel(x, y);
+                if (pixel.r + pixel.g + pixel.b <= colorSum)
+                    break;
+                if (x == right)
+                {
+                    bottom = y - 1;
+                    break outer2;
+                }
+            }
+        //I must increment the right and the bottom since they are not inclusive
+        frame = Rectangle(left, top, right + 1, bottom + 1);
     }
 
-    //here we slice the frame's rectangle in 400 pieces
+    //here we slice the frame's rectangle into 484 pieces
     void slice_the_frame()
     {
         real xDist = frame.right - frame.left, yDist = frame.bottom - frame.top;
-        auto rangeH = iota(frame.left, frame.right + 1, xDist / 20.0L),
-             rangeV = iota(frame.top, frame.bottom + 1, yDist / 20.0L);
-        foreach (i; 0 .. 21)
+        auto rangeH = iota(frame.left, frame.right + 1, xDist / 22.0L), rangeV = iota(frame.top, frame.bottom + 1, yDist / 22.0L);
+        foreach (i; 0 .. 23)
             piecesH[i] = cast(int) rangeH[i], piecesV[i] = cast(int) rangeV[i];
     }
 
-    //here we draw all of the 400 divisions of the frame's rectangle
+    //here we draw all of the 484 divisions of the frame's rectangle
     void draw_the_frame()
     {
         ScreenPainter painter = window.draw();
         painter.outlineColor = Color.green(), painter.fillColor = Color.transparent();
-        foreach (v; 0 .. 20)
-            foreach (h; 0 .. 20)
-                rectangularPieces[v * 20 + h] = Rectangle(Point(piecesH[h], piecesV[v]), Point(piecesH[h + 1], piecesV[v + 1]));
+        foreach (v; 0 .. 22)
+            foreach (h; 0 .. 22)
+                rectangularPieces[v * 22 + h] = Rectangle(Point(piecesH[h], piecesV[v]), Point(piecesH[h + 1], piecesV[v + 1]));
         foreach (piece; rectangularPieces)
             painter.drawRectangle(piece.upperLeft(), piece.lowerRight());
     }
@@ -182,7 +206,7 @@ mixin template declare_necessary_variables_and_delegates()
     void count_the_written_parts()
     {
         writtenParts = false;
-        foreach (i; 0 .. 400)
+        foreach (i; 0 .. 484)
             foreach (point; writtenPoints.byKey)
                 if (rectangularPieces[i].contains(point))
                 {
