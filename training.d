@@ -6,6 +6,7 @@ import std.file : readText, write;
 import std.math : abs;
 import std.stdio : writeln;
 
+//these global variables allow me to control the whole program
 bool individual = 0, right = 0, trainIt = 1;
 
 //This function trains it to adjust the weights
